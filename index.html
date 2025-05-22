@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Vidify</title>
+    <link
+      rel="icon"
+      href="https://cdn.glitch.global/fbfd0448-2a06-4d69-bf6d-e4000886d07e/vidifypng?v=1747079593691"
+    />
+    <style>
+      body {
+        font-family: Helvetica, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f2f2f2;
+        color: #000;
+      }
+
+      header {
+        text-align: center;
+        padding: 20px;
+      }
+
+      header img {
+        width: 120px;
+      }
+
+      #searchForm {
+        padding: 10px 20px;
+      }
+
+      #searchInput {
+        padding: 10px;
+        width: 100%;
+        max-width: 100%;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-sizing: border-box;
+      }
+
+      .card-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        height: 80vh;
+        overflow-y: auto;
+      }
+
+      #videos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        justify-content: center;
+      }
+
+      .video-card {
+        width: 220px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .video-card img {
+        width: 100%;
+        border-radius: 10px;
+      }
+
+      .video-title {
+        font-weight: bold;
+        margin-top: 4px;
+        line-height: 1.2em;
+        max-height: 2.4em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .channel-name {
+        font-size: 0.9em;
+        color: #555;
+      }
+
+      #overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.85);
+        display: none;
+        justify-content: center;
+        align-items: flex-start;
+        z-index: 999;
+        overflow-y: auto;
+        padding: 40px 20px;
+        box-sizing: border-box;
+      }
+
+      #playerContainer {
+        background: #fff;
+        padding: 20px;
+        border-radius: 12px;
+        max-width: 800px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        position: relative;
+        box-sizing: border-box;
+      }
+
+      #playerContainer iframe {
+        width: 100%;
+        height: 400px;
+        border-radius: 8px;
+      }
+
+      #descriptionArea {
+        background: #f1f1f1;
+        padding: 12px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      #descriptionArea img {
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+      }
+
+      .desc-channel {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      #descriptionArea a {
+        text-decoration: none;
+        font-weight: bold;
+        color: #007bff;
+      }
+
+      #descriptionArea ul {
+        padding-left: 20px;
+      }
+
+      #descriptionArea span {
+        background: #ddd;
+        padding: 4px 8px;
+        margin: 2px;
+        display: inline-block;
+        border-radius: 4px;
+        font-size: 0.85em;
+      }
+
+      #closeBtn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #e00;
+        color: #fff;
+        border: none;
+        font-size: 18px;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      }
+
+      @media (max-width: 600px) {
+        .video-card {
+          width: 90%;
+        }
+        #playerContainer iframe {
+          height: 250px;
+        }
+      }
+
+      #sourceSelect {
+        padding: 8px;
+        margin-top: 10px;
+        font-size: 16px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card-container">
+      <h1>▶ Vidify</h1>
+      <form id="searchForm" onsubmit="searchVideos(event)">
+        <input id="searchInput" placeholder="Search YouTube videos..." />
+      </form>
+      <div id="videos"></div>
+    </div>
+
+    <div id="overlay">
+      <div id="playerContainer">
+        <button id="closeBtn" onclick="closeOverlay()">✕</button>
+        <select id="sourceSelect" onchange="changeVideoSource()">
+          <option value="youtube">YouTube</option>
+          <option value="youtube-nocookie">YouTube (No Cookie)</option>
+          <option value="yout-ube">YouT-ube</option>
+          <option value="yewtu.be">Yewtu.be</option>
+          <option value="piped.video">Piped.video</option>
+          <option value="googleapis">Google Apis</option>
+        </select>
+        <div id="videoPlayer"></div>
+        <div id="descriptionArea"></div>
+      </div>
+    </div>
+
+    <script>
+      let currentVideoId = "";
+      let currentSource = "youtube";
+
+      const apiKey = "AIzaSyBiTRRhqc76PSmBGSuoIjB-FL-sLay3HQQ";
+      const videosEl = document.getElementById("videos");
+      const overlay = document.getElementById("overlay");
+      const videoPlayer = document.getElementById("videoPlayer");
+      const descriptionArea = document.getElementById("descriptionArea");
+      const sourceSelect = document.getElementById("sourceSelect");
+
+      async function searchVideos(event, query) {
+        if (event) event.preventDefault();
+        const q = query || document.getElementById("searchInput").value || "technology";
+        const res = await fetch(
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(
+            q
+          )}&type=video&maxResults=40&key=${apiKey}`
+        );
+        const data = await res.json();
+        displayVideos(data.items);
+      }
+
+      function displayVideos(videos) {
+        videosEl.innerHTML = "";
+        videos.forEach((video) => {
+          const videoId = video.id.videoId;
+          const title = video.snippet.title;
+          const channelTitle = video.snippet.channelTitle;
+          const thumbnail = video.snippet.thumbnails.medium.url;
+
+          const card = document.createElement("div");
+          card.className = "video-card";
+          card.innerHTML = `
+            <img src="${thumbnail}" alt="${title}">
+            <p class="video-title">${title}</p>
+            <p class="channel-name">${channelTitle}</p>
+          `;
+          card.onclick = () => openOverlay(videoId);
+          videosEl.appendChild(card);
+        });
+      }
+
+      function closeOverlay() {
+        overlay.style.display = "none";
+        videoPlayer.innerHTML = "";
+        descriptionArea.innerHTML = "";
+      }
+
+      async function openOverlay(videoId) {
+        currentVideoId = videoId;
+        currentSource = sourceSelect.value;
+        overlay.scrollTo(0, 0);
+        overlay.style.display = "flex";
+        loadPlayer();
+        await loadDescription(videoId);
+      }
+
+      function loadPlayer() {
+        let embedUrl = "";
+
+        switch (currentSource) {
+          case "youtube":
+            embedUrl = `https://www.youtube.com/embed/${currentVideoId}?autoplay=1`;
+            break;
+          case "youtube-nocookie":
+            embedUrl = `https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1`;
+            break;
+          case "yewtu.be":
+            embedUrl = `https://invidious.nerdvpn.de/embed/${currentVideoId}`;
+            break;
+          case "piped.video":
+            embedUrl = `https://piped.video/watch?v=${currentVideoId}`;
+            break;
+          case "googleapis":
+            embedUrl = `https://youtube.googleapis.com/embed/${currentVideoId}`;
+            break;
+          case "yout-ube":
+            embedUrl = `https://yout-ube.com/watch?v=${currentVideoId}`;
+            break;
+          default:
+            embedUrl = `https://www.youtube.com/embed/${currentVideoId}?autoplay=1`;
+        }
+
+        videoPlayer.innerHTML = `<iframe src="${embedUrl}" frameborder="0" allowfullscreen></iframe>`;
+      }
+
+      function changeVideoSource() {
+        currentSource = sourceSelect.value;
+        if (currentVideoId) {
+          loadPlayer();
+        }
+      }
+
+      async function loadDescription(videoId) {
+        const videoRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`
+        );
+        const videoData = (await videoRes.json()).items[0];
+        const snippet = videoData.snippet;
+        const stats = videoData.statistics;
+
+        const channelId = snippet.channelId;
+        const channelRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${apiKey}`
+        );
+        const channelData = (await channelRes.json()).items[0];
+
+        const commentsRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=3&key=${apiKey}`
+        );
+        const commentsData = await commentsRes.json();
+
+        const channelImg = channelData.snippet.thumbnails.default.url;
+        const channelName = channelData.snippet.title;
+        const channelSubs = channelData.statistics.subscriberCount;
+        const likes = stats.likeCount;
+        const desc = snippet.description || "No description.";
+        const tags = snippet.tags || [];
+
+        const comments = (commentsData.items || [])
+          .map((comment) => {
+            return `<li>${comment.snippet.topLevelComment.snippet.textDisplay}</li>`;
+          })
+          .join("");
+
+        const tagEls = tags
+          .slice(0, 10)
+          .map((tag) => `<span>#${tag}</span>`)
+          .join("");
+
+        descriptionArea.innerHTML = `
+          <div class="desc-channel">
+            <img src="${channelImg}" alt="Channel">
+            <a href="https://www.youtube.com/channel/${channelId}" target="_blank">${channelName}</a>
+          </div>
+          <p>Subscribers: ${channelSubs}</p>
+          <p>Likes: ${likes || "N/A"}</p>
+          <p>${desc}</p>
+          <h4>Top Comments</h4>
+          <ul>${comments}</ul>
+          <h4>Tags</h4>
+          <div>${tagEls}</div>
+        `;
+      }
+
+      searchVideos(null, "mark rober");
+    </script>
+  </body>
+</html>
